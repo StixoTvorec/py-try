@@ -3,25 +3,27 @@
 
 # from http.client import HTTPConnection
 # from pandas import DataFrame
-from urllib.request import urlopen
+# from urllib.request import urlopen
+from requests import get as get_request
+from datetime import datetime as dt
 import sys
 import lxml.html as html
 import mysql.connector as c
-from datetime import datetime as dt
 
 defaultDbConfig = {
     'user': 'test',
     'password': 'test',
-    'host': '127.0.0.1',
-    'database': 'test',
+    'host': 'localhost',
+    'database': 'shop',
     'raise_on_warnings': True,
 }
 tables = {
     'goods': 'goods',
     'prices': 'prices',
-    'emails': 'emails', """ todo """
+    'emails': 'emails',
     'shops': 'shops',
     'categories': 'categories',
+    'vendors': 'vendors',
 }
 db = None
 
@@ -31,15 +33,18 @@ class Http:
     def __init__(self):
         pass
 
-    def get(self, filename: str, offset: int = -1, maxlen: int = -1):
-        ret = urlopen(filename)
-        charset = ret.headers.get_content_charset()
-        ret = ret.read()
+    def get(self, filename: str, offset: int = -1, maxlen: int = -1, headers: dict=None, cookies: dict=None):
+        if not headers:
+            headers = {}
+        if not cookies:
+            cookies = ()
+        response = get_request(filename, headers=headers, cookies=cookies)
+        ret = response.text
         if offset > 0:
             ret = ret[offset:]
         if maxlen > 0:
             ret = ret[:maxlen]
-        return ret.decode(charset)
+        return ret
 
 
 class File:
@@ -66,29 +71,34 @@ class Parser:
     def __init__(self, url: str):
         self.url = url
 
-    def find(self, selector):
-        if len(self.html) < 1:
+    def find(self, selector, _html: str = '', cookies: dict = None, headers: dict = None):
+        if len(_html) < 1 and len(self.html) < 1:
             if self.url.find('://') > 0:
                 http = Http()
-                content = http.get(self.url)
+                content = http.get(self.url, cookies=cookies, headers=headers)
             else:
                 file = File()
                 content = file.get(self.url)
             self.html = html.document_fromstring(content)
 
-        return self.html.cssselect(selector)
+        if len(_html) > 0:
+            _html = html.document_fromstring(_html)
+        else:
+            _html = self.html
 
-    def getAttr(self, element, attr: str):
+        return _html.cssselect(selector)
+
+    def get_attr(self, element, attr: str):
         """
         :param element:
         :param attr:
         :return:
         """
-        if attr in self.getKeys(element):
+        if attr in self.get_keys(element):
             return element.get(attr)
         return ''
 
-    def getKeys(self, element):
+    def get_keys(self, element):
         return element.keys()
 
 
@@ -110,17 +120,30 @@ class Db:
         return self
 
     def fetch(self, size: int = 10):
+        if size == 1:
+            return self.cursor.fetchone()
+        if size == 0:
+            return self.cursor.fetchall()
         return self.cursor.fetchmany(size)
 
     def close(self):
         self.cursor.close()
         self.connector.close()
 
+    def insert_id(self):
+        return self.cursor.lastrowid
 
-def _create_connection():
+
+def get_content(url, cookies: dict = None, headers: dict = None):
+    return Http().get(url, cookies=cookies, headers=headers)
+
+
+def get_db(config = None):
     global db
+    if not config:
+        config = defaultDbConfig
     if type(db) == type(None):
-        db = get_db(defaultDbConfig)
+        db = Db(config)
     return db
 
 
@@ -128,31 +151,64 @@ def get_parser(url: str):
     return Parser(url)
 
 
-def get_db(config):
-    return Db(config)
-
+# todo: переложить на модели https://docs.djangoproject.com/en/1.11/topics/db/models/
 
 def insert_price(product_id: int, price: float):
-    db = _create_connection()
-    q = db.query('SELECT count(1) as c WHERE price=%s AND DATE(good_id)=%s AND date=DATE(%s)', (price, product_id, dt.now(),))
-    result = q.fetch(1)
-    if hasattr(result, 'c') and result['c'] > 0:
-        return
-    db.execute('INSERT INTO prices (price, good_id, date) VALUES (%s, %s, %s)', (price, product_id, dt.now(),))
+    db = get_db()
+    q = db.query('SELECT id FROM ' + tables.get('prices') + ' WHERE good_id=%s AND DATE(good_id)=DATE(%s)', (product_id, dt.now(),)).fetch(1)
+    if q and 'id' in q:
+        return q['id']
+    return db.execute(
+        'INSERT INTO ' + tables.get('prices') + ' (price, good_id, date) VALUES (%s, %s, %s)'
+        , (price, product_id, dt.now(),)
+    ).insert_id()
 
 
-def insert_product(product_id: int, shop_id: int):
-    db = _create_connection()
-    q = db.query('SELECT count(1) as c WHERE price=%s AND DATE(good_id)=%s AND date=DATE(%s)', (price, product_id, dt.now(),))
-    result = q.fetch(1)
-    if hasattr(result, 'c') and result['c'] > 0:
-        return
-    db.execute('INSERT INTO prices (price, good_id, date) VALUES (%s, %s, %s)', (price, product_id, dt.now(),))
+def insert_product(product_id: int, shop_id: int, name: str, vendor_id: int, category_id: int):
+    db = get_db()
+    q = db.query('SELECT id FROM ' + tables.get('goods') + ' WHERE good_id=%s AND shop_id=%s', (product_id, shop_id,)).fetch(1)
+    if q and 'id' in q:
+        return q['id']
+    return db.execute(
+        'INSERT INTO %s (price, good_id, date) VALUES (%s, %s, %s, %s, %s, %s)'
+        , (tables.get('goods'), product_id, dt.now(), name, vendor_id, category_id,)
+    ).insert_id()
+
+
+def insert_category(name: str, url: str, shop_id: int):
+    db = get_db()
+    q = db.query('SELECT id FROM ' + tables.get('categories') + ' WHERE url=%s AND shop_id=%s', (url, shop_id,)).fetch(1)
+    if q and 'id' in q:
+        return q['id']
+    return db.execute(
+        'INSERT INTO ' + tables.get('categories') + ' (name, url, date, shop_id) VALUES (%s, %s, %s, %s)'
+        , (name, url, dt.now(), shop_id,)
+    ).insert_id()
+
+
+def insert_vendor(name: str):
+    db = get_db()
+    q = db.query('SELECT id FROM ' + tables.get('vendors') + ' WHERE name=%s', (name,)).fetch(1)
+    if q and 'id' in q:
+        return q['id']
+    return db.execute(
+        'INSERT INTO ' + tables.get('vendors') + ' (name) VALUES (%s)'
+        , (name,)
+    ).insert_id()
+
+
+def insert_store(name: str, url: str):
+    db = get_db()
+    q = db.query('SELECT id FROM ' + tables.get('shops') + ' WHERE url=%s', (url,)).fetch(1)
+    if q and 'id' in q:
+        return q['id']
+    return db.execute(
+        'INSERT INTO ' + tables.get('shops') + ' (name, url) VALUES (%s, %s)'
+        , (name, url,)
+    ).insert_id()
 
 
 if __name__ == '__main__':
-
-    # print(dt.now(), .2 + .1 - .2 - .1)
 
     exit(0)
 
