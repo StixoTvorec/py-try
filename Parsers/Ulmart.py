@@ -11,7 +11,7 @@ shopId = 0
 
 
 def product_process(url: str, params: dict):
-    pass
+    page = params['page'] if hasattr(params, 'page') else 0
 
 
 def page_process(url: str, params: dict):
@@ -28,6 +28,7 @@ if __name__ == '__main__':
         print('err')
         exit(1)
     for i in menu:
-        print(i.get('href'))
-        # if 'href' in i.keys() and i.get('href').find('/catalog/') == 0:
-        #     print(i.get('href'))
+        if 'href' in i.keys() and i.get('href').find('/catalog/') == 0:
+            page_process(i.get('href'), {'page': 0,})
+
+

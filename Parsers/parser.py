@@ -9,6 +9,8 @@ from datetime import datetime as dt
 import sys
 import lxml.html as html
 import mysql.connector as c
+from math import ceil
+from random import random
 
 defaultDbConfig = {
     'user': 'test',
@@ -110,12 +112,13 @@ class Db:
     def __init__(self, config: dict):
         self.connector = c.connect(**config)
 
-    def execute(self, query: str, args: dict = ()):
+    def execute(self, query: str, args: tuple = tuple()):
+        self.cursor = self.connector.cursor(buffered=True)
         self.cursor.execute(query, args)
         return self
 
-    def query(self, query: str, args: dict = ()):
-        self.cursor = self.connector.cursor()
+    def query(self, query: str, args: tuple = tuple()):
+        self.cursor = self.connector.cursor(buffered=True)
         self.execute(query, args)
         return self
 
@@ -127,6 +130,9 @@ class Db:
         return self.cursor.fetchmany(size)
 
     def close(self):
+        global db
+        db = None
+        self.connector.commit()
         self.cursor.close()
         self.connector.close()
 
@@ -134,11 +140,11 @@ class Db:
         return self.cursor.lastrowid
 
 
-def get_content(url, cookies: dict = None, headers: dict = None):
+def get_content(url: str, cookies: dict = None, headers: dict = None):
     return Http().get(url, cookies=cookies, headers=headers)
 
 
-def get_db(config = None):
+def get_db(config=None):
     global db
     if not config:
         config = defaultDbConfig
@@ -156,56 +162,69 @@ def get_parser(url: str):
 def insert_price(product_id: int, price: float):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('prices') + ' WHERE good_id=%s AND DATE(good_id)=DATE(%s)', (product_id, dt.now(),)).fetch(1)
-    if q and 'id' in q:
-        return q['id']
-    return db.execute(
-        'INSERT INTO ' + tables.get('prices') + ' (price, good_id, date) VALUES (%s, %s, %s)'
-        , (price, product_id, dt.now(),)
-    ).insert_id()
+    if type(q) == type(()):
+        id = q[0]
+    else:
+        id = db.execute(
+            'INSERT INTO ' + tables.get('prices') + ' (price, good_id, date) VALUES (%s, %s, %s)'
+            , (price, product_id, dt.now(),)
+        ).insert_id()
+    db.close()
+    return id
 
 
 def insert_product(product_id: int, shop_id: int, name: str, vendor_id: int, category_id: int):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('goods') + ' WHERE good_id=%s AND shop_id=%s', (product_id, shop_id,)).fetch(1)
-    if q and 'id' in q:
-        return q['id']
-    return db.execute(
+    print(q)
+    if type(q) == type(()):
+        id = q[0]
+    else:
+        id = db.execute(
         'INSERT INTO %s (price, good_id, date) VALUES (%s, %s, %s, %s, %s, %s)'
         , (tables.get('goods'), product_id, dt.now(), name, vendor_id, category_id,)
     ).insert_id()
+    db.close()
+    return id
 
 
 def insert_category(name: str, url: str, shop_id: int):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('categories') + ' WHERE url=%s AND shop_id=%s', (url, shop_id,)).fetch(1)
-    if q and 'id' in q:
-        return q['id']
-    return db.execute(
-        'INSERT INTO ' + tables.get('categories') + ' (name, url, date, shop_id) VALUES (%s, %s, %s, %s)'
-        , (name, url, dt.now(), shop_id,)
-    ).insert_id()
+    if type(q) == type(()):
+        id = q[0]
+    else:
+        id = db.execute(
+            'INSERT INTO ' + tables.get('categories') + ' (name, url, date, shop_id) VALUES (%s, %s, %s, %s)'
+            , (name, url, dt.now(), shop_id,)
+        ).insert_id()
+    db.close()
+    return id
 
 
 def insert_vendor(name: str):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('vendors') + ' WHERE name=%s', (name,)).fetch(1)
-    if q and 'id' in q:
-        return q['id']
-    return db.execute(
-        'INSERT INTO ' + tables.get('vendors') + ' (name) VALUES (%s)'
-        , (name,)
-    ).insert_id()
+    if type(q) == type(()):
+        id = q[0]
+    else:
+        id = db.execute(
+            'INSERT INTO ' + tables.get('vendors') + ' (name) VALUES (%s)'
+            , (name,)
+        ).insert_id()
+    db.close()
+    return id
 
 
 def insert_store(name: str, url: str):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('shops') + ' WHERE url=%s', (url,)).fetch(1)
-    if q and 'id' in q:
-        return q['id']
-    return db.execute(
+    id = q[0] if type(q) == type(()) else id = db.execute(
         'INSERT INTO ' + tables.get('shops') + ' (name, url) VALUES (%s, %s)'
         , (name, url,)
     ).insert_id()
+    db.close()
+    return id
 
 
 if __name__ == '__main__':
