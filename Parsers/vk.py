@@ -4,11 +4,79 @@
 import parser as p
 import json
 
+apiVersion = '5.2'
+oauthUrl = 'https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v=5.52&scope={}'
+apiUrl = 'https://api.vk.com/method/{}?v={}&access_token={}'
+
+access = (
+    #notify
+    1
+    #friends
+    + 2
+    #protos
+    + 4
+    #audio
+    + 8
+    #video
+    + 16
+    #pages
+    + 128
+    #status
+    + 1024
+    #notes
+    # -- messages
+    # + 4096
+    #offline
+    + 65536
+    #docs
+    + 131072
+    #groups
+    + 262144
+)
+
 vk_config = p.get_content('./vk_key.json')
 if len(vk_config) < 1:
     print('Error. No config file!')
     exit(0)
 
-vk_config = json.loads(vk_config)
+vk_config = json.loads(vk_config.decode('utf-8'))
 
-print(vk_config)
+if not (
+        isinstance(vk_config, object)
+        and 'secret_key' in vk_config
+        and 'service_key' in vk_config
+        and 'app_id' in vk_config
+    ):
+    print('error parse config')
+    exit(1)
+
+secretKey = vk_config['secret_key']
+serviceKey = vk_config['service_key']
+appId = vk_config['app_id']
+
+user = int(input("Input you user id: \n"))
+
+if user < 0:
+    print('Error!')
+    exit(1)
+
+code = p.get_db().query('SELECT id FROM vk WHERE user = %s LIMIT 1', (user,)).fetch(1)
+
+print(code, isinstance(code, tuple))
+exit()
+
+if not isinstance(code, tuple):
+    db = p.get_db().execute('INSERT INTO vk (user, token) VALUES (%s, "")', (user,))
+    id = db.insert_id()
+    db.close()
+else:
+    id = code[0]
+
+code = oauthUrl.format(appId, access,)
+code = input("Please, go to {} and paste code here\n".format(code,))
+
+print(code)
+
+# def request(method):
+    # url = apiUrl.format(method, apiVersion, token)
+    # data = p.Http().get(url)
