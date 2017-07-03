@@ -4,9 +4,9 @@
 import parser as p
 import json
 
-apiVersion = '5.2'
+apiVersion = '5.65'
 oauthUrl = 'https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v=5.52&scope={}'
-apiUrl = 'https://api.vk.com/method/{}?v={}&access_token={}'
+apiUrl = 'https://api.vk.com/method/{}?v={}&access_token={}&{}'
 
 access = (
     #notify
@@ -60,23 +60,32 @@ if user < 0:
     print('Error!')
     exit(1)
 
-code = p.get_db().query('SELECT id FROM vk WHERE user = %s LIMIT 1', (user,)).fetch(1)
-
-print(code, isinstance(code, tuple))
-exit()
+code = p.get_db().query('SELECT id, token FROM vk WHERE user = %s LIMIT 1', (user,)).fetch(1)
 
 if not isinstance(code, tuple):
     db = p.get_db().execute('INSERT INTO vk (user, token) VALUES (%s, "")', (user,))
     id = db.insert_id()
     db.close()
+    code = oauthUrl.format(appId, access,)
+    code = input("Please, go to {} and paste code here\n".format(code,))
+    p.get_db().execute('UPDATE vk SET token = %s WHERE user = %s', (code, user,)).close()
+    token = code
 else:
     id = code[0]
+    token = code[1]
 
-code = oauthUrl.format(appId, access,)
-code = input("Please, go to {} and paste code here\n".format(code,))
 
-print(code)
+def request(method: str, more: str = ""):
+    url = apiUrl.format(method, apiVersion, token, more)
+    print(url)
+    return p.Http().get(url)
 
-# def request(method):
-    # url = apiUrl.format(method, apiVersion, token)
-    # data = p.Http().get(url)
+print("User: {}\nToken: {}\n".format(id, token,))
+
+while True:
+    method = input("Method: \n")
+    moreParams = input("More params: \n")
+    if method == -1:
+        break
+    data = request(method, moreParams)
+    print(json.loads(data))
