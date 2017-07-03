@@ -162,7 +162,7 @@ def get_parser(url: str):
 def insert_price(product_id: int, price: float):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('prices') + ' WHERE good_id=%s AND DATE(good_id)=DATE(%s)', (product_id, dt.now(),)).fetch(1)
-    if type(q) == type(()):
+    if isinstance(q, ()):
         id = q[0]
     else:
         id = db.execute(
@@ -177,7 +177,7 @@ def insert_product(product_id: int, shop_id: int, name: str, vendor_id: int, cat
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('goods') + ' WHERE good_id=%s AND shop_id=%s', (product_id, shop_id,)).fetch(1)
     print(q)
-    if type(q) == type(()):
+    if isinstance(q, ()):
         id = q[0]
     else:
         id = db.execute(
@@ -191,7 +191,7 @@ def insert_product(product_id: int, shop_id: int, name: str, vendor_id: int, cat
 def insert_category(name: str, url: str, shop_id: int):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('categories') + ' WHERE url=%s AND shop_id=%s', (url, shop_id,)).fetch(1)
-    if type(q) == type(()):
+    if isinstance(q, ()):
         id = q[0]
     else:
         id = db.execute(
@@ -205,7 +205,7 @@ def insert_category(name: str, url: str, shop_id: int):
 def insert_vendor(name: str):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('vendors') + ' WHERE name=%s', (name,)).fetch(1)
-    if type(q) == type(()):
+    if isinstance(q, ()):
         id = q[0]
     else:
         id = db.execute(
@@ -219,10 +219,13 @@ def insert_vendor(name: str):
 def insert_store(name: str, url: str):
     db = get_db()
     q = db.query('SELECT id FROM ' + tables.get('shops') + ' WHERE url=%s', (url,)).fetch(1)
-    id = q[0] if type(q) == type(()) else id = db.execute(
-        'INSERT INTO ' + tables.get('shops') + ' (name, url) VALUES (%s, %s)'
-        , (name, url,)
-    ).insert_id()
+    if isinstance(q, ()):
+        id = q[0]
+    else:
+        id = db.execute(
+            'INSERT INTO ' + tables.get('shops') + ' (name, url) VALUES (%s, %s)'
+            , (name, url,)
+        ).insert_id()
     db.close()
     return id
 
