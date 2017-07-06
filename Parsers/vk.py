@@ -2,7 +2,18 @@
 # -*- coding: utf-8 -*-
 
 import parser as p
+from requests import Session
 import json
+from os import (
+    listdir,
+    getcwd
+)
+from os.path import (
+    isfile,
+    isdir,
+    join,
+    splitext
+)
 
 apiVersion = '5.65'
 oauthUrl = 'https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v=5.52&scope={}'
@@ -54,7 +65,7 @@ secretKey = vk_config['secret_key']
 serviceKey = vk_config['service_key']
 appId = vk_config['app_id']
 
-user = int(input("Input you user id: \n"))
+user = vk_config['user_id'] #int(input("Input you user id: \n"))
 
 if user < 0:
     print('Error!')
@@ -77,15 +88,78 @@ else:
 
 def request(method: str, more: str = ""):
     url = apiUrl.format(method, apiVersion, token, more)
-    print(url)
     return p.Http().get(url)
 
-print("User: {}\nToken: {}\n".format(id, token,))
+print("User: {}\nToken: {}\nUserId: {}\n".format(id, token, user,))
+
+class User:
+
+    albums = dict()
+
+    def _upload(self, url: str, files: dict, album_id: int, user_id: int):
+
+        # uploadedFiles = b''.decode('string_escape')
+        pass
+
+    def photosGetAlbums(self):
+        data = request('photos.getAlbums', '')
+        self.albums = json.loads(data)
+        return data
+
+    def photos(self):
+        if not (isinstance(self.albums, object) and 'response' in self.albums and 'items' in self.albums.get('response')):
+            return False
+        url = ','.join(map(lambda a: str(a.get('id'))+':6000', self.albums.get('response').get('items')))
+        print(url)
+        exit()
+        data = request('execute.getAllUserPhotos', '')
+        return data
+
+    def uploadPhotos(self):
+        album = vk_config['album']
+        data = request('photos.getUploadServer', 'album_id=' + album)
+        data = json.loads(data)
+        if not (isinstance(data, object) and 'response' in data and 'upload_url' in data.get('response')):
+            return False
+        data = data.get('response')
+        url = data.get('upload_url')
+        album = data.get('album_id')
+        user_id = data.get('user_id')
+        path = join(getcwd(), 'vk_upload_files')
+        if not isdir(path):
+            return False
+        _files = [f for f in listdir(path) if isfile(join(path, f))]
+        print(_files)
+        files = []
+        for f in _files:
+            _, ext = splitext(f)
+            if ext in ['.jpeg', '.jpg', '.png']:
+                files.append(f)
+        print(files)
+        i = 0
+        _list = {}
+        for f in files:
+            if i == 5:
+                i = 0
+                self._upload(url, _list, album, user_id)
+                _list = {}
+            index = 'file' + str(i+1)
+            _list[index] = open(join(path, f))
+            i += 1
+        if i != 5:
+            self._upload(url, _list, album, user_id)
+
+
+newUser = User()
+# newUser.photosGetAlbums()
+# newUser.photos()
+newUser.uploadPhotos()
+exit()
 
 while True:
     method = input("Method: \n")
-    moreParams = input("More params: \n")
+    # moreParams = input("More params: \n")
     if method == -1:
         break
-    data = request(method, moreParams)
-    print(json.loads(data))
+    m = getattr(newUser, method)
+    print(json.dumps(json.loads(m()), sort_keys=True, indent=4))
