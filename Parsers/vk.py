@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-import parser as p
+import iparser as p
 from requests import Session
 import json
 from os import (
@@ -172,6 +172,7 @@ class User:
             print('uploading start')
             for f in files:
                 if i == 5:
+                    n += 5
                     self._upload(url, _list)
                     for _ in _move:
                         rename(_, join(uploadedPath, basename(_)))
