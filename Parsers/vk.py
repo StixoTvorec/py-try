@@ -16,7 +16,7 @@ from os.path import (
 )
 
 apiVersion = '5.65'
-oauthUrl = 'https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v={}&scope={}'
+oauthUrl = 'https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html&response_type=token&v={}&scope={}'
 apiUrl = 'https://api.vk.com/method/{}?v={}&access_token={}&{}'
 
 access = (
