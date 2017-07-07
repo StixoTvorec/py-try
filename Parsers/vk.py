@@ -6,15 +6,19 @@ from requests import Session
 import json
 from os import (
     listdir,
-    getcwd
+    getcwd,
+    mkdir,
+    rename,
 )
 from os.path import (
     isfile,
     isdir,
     join,
-    splitext
+    splitext,
+    basename,
 )
 
+configFile = './vk_key.json'
 apiVersion = '5.65'
 oauthUrl = 'https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html&response_type=token&v={}&scope={}'
 apiUrl = 'https://api.vk.com/method/{}?v={}&access_token={}&{}'
@@ -45,7 +49,7 @@ access = (
     + 262144
 )
 
-vk_config = p.get_content('./vk_key.json')
+vk_config = p.get_content(configFile)
 if len(vk_config) < 1:
     print('Error. No config file!')
     exit(0)
@@ -54,9 +58,6 @@ vk_config = json.loads(vk_config.decode('utf-8'))
 
 if not (
         isinstance(vk_config, object)
-        and 'secret_key' in vk_config
-        and 'service_key' in vk_config
-        and 'app_id' in vk_config
     ):
     print('error parse config')
     exit(1)
@@ -64,26 +65,32 @@ if not (
 secretKey = vk_config['secret_key']
 serviceKey = vk_config['service_key']
 appId = vk_config['app_id']
+token = vk_config['token']
+uploadAlbumId = vk_config['album']
 
 user = vk_config['user_id'] #int(input("Input you user id: \n"))
 
-if user < 0:
+if int(user) < 0:
     print('Error!')
     exit(1)
 
-code = p.get_db().query('SELECT id, token FROM vk WHERE user = %s LIMIT 1', (user,)).fetch(1)
-
-if not isinstance(code, tuple):
-    db = p.get_db().execute('INSERT INTO vk (user, token) VALUES (%s, "")', (user,))
-    id = db.insert_id()
-    db.close()
+if token == '':
     code = oauthUrl.format(appId, apiVersion, access,)
-    code = input("Please, go to {} and paste code here\n".format(code,))
-    p.get_db().execute('UPDATE vk SET token = %s WHERE user = %s', (code, user,)).close()
-    token = code
-else:
-    id = code[0]
-    token = code[1]
+    token = input("Please, go to {} and paste code here\n".format(code,))
+    if token == '':
+        print('token is empty!')
+        exit(1)
+    data = {
+      "app_id": appId,
+      "secret_key": secretKey,
+      "service_key": serviceKey,
+      "user_id": user,
+      "album": uploadAlbumId,
+      "token": token
+    }
+    _ = open(configFile, 'wb')
+    _.write(json.dumps(data))
+    _.close()
 
 
 def request(method: str, more: str = ""):
@@ -96,11 +103,7 @@ class User:
 
     albums = dict()
 
-    def _upload(self, url: str, files, album_id: int, user_id: int):
-        # print(url)
-        # print(files)
-        # print(album_id)
-        # print(user_id)
+    def _upload(self, url: str, files):
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 5.1; rv:20.0) Gecko/20100101 Firefox/20.0',
@@ -116,9 +119,6 @@ class User:
 
         if q.status_code == 200:
             j = q.json()
-            # print('J:')
-            # print(j)
-            # print('')
             server = str(j['server'])
             aid = str(j['aid'])
             hash = str(j['hash'])
@@ -141,38 +141,52 @@ class User:
         return data
 
     def uploadPhotos(self):
-        album = vk_config['album']
-        data = request('photos.getUploadServer', 'album_id=' + str(album))
+        if uploadAlbumId == '':
+            print('upload_album_id is empty')
+            return False
+        data = request('photos.getUploadServer', 'album_id=' + str(uploadAlbumId))
         data = json.loads(data)
         # print(data)
         if not (isinstance(data, object) and 'response' in data and 'upload_url' in data.get('response')):
             return False
         data = data.get('response')
         url = data.get('upload_url')
-        album = data.get('album_id')
-        user_id = data.get('user_id')
         path = join(getcwd(), 'vk_upload_files')
         if not isdir(path):
             return False
+        uploadedPath = join(path, 'uploaded')
+        if not isdir(uploadedPath):
+            mkdir(uploadedPath, 0o777)
         _files = [f for f in listdir(path) if isfile(join(path, f))]
-        # print(_files)
         files = []
         for f in _files:
             _, ext = splitext(f)
             if ext in ['.jpeg', '.jpg', '.png']:
                 files.append(f)
         i = 0
+        n = 0
+        countFiles = len(files)
         _list = []
-        for f in files:
-            if i == 5:
-                self._upload(url, _list, album, user_id)
-                i = 0
-                _list = []
-            index = 'file' + str(i+1)
-            _list.append((index, open(join(path, f), 'rb')))
-            i += 1
-        if i != 5:
-            self._upload(url, _list, album, user_id)
+        _move = []
+        if countFiles > 0:
+            print('uploading start')
+            for f in files:
+                if i == 5:
+                    self._upload(url, _list)
+                    for _ in _move:
+                        rename(_, join(uploadedPath, basename(_)))
+                    print('uploaded ' + str(n) + '/' + str(countFiles))
+                    i = 0
+                    _list = []
+                    _move = []
+                index = 'file' + str(i+1)
+                _list.append((index, open(join(path, f), 'rb'),))
+                i += 1
+            if i != 5:
+                self._upload(url, _list)
+                for _ in _move:
+                    rename(_, join(uploadedPath, basename(_)))
+            print('uploaded finish')
 
 newUser = User()
 # newUser.photosGetAlbums()
