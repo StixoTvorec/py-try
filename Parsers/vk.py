@@ -16,7 +16,7 @@ from os.path import (
 )
 
 apiVersion = '5.65'
-oauthUrl = 'https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v=5.52&scope={}'
+oauthUrl = 'https://oauth.vk.com/authorize?client_id={}&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends&response_type=token&v={}&scope={}'
 apiUrl = 'https://api.vk.com/method/{}?v={}&access_token={}&{}'
 
 access = (
@@ -77,7 +77,7 @@ if not isinstance(code, tuple):
     db = p.get_db().execute('INSERT INTO vk (user, token) VALUES (%s, "")', (user,))
     id = db.insert_id()
     db.close()
-    code = oauthUrl.format(appId, access,)
+    code = oauthUrl.format(appId, apiVersion, access,)
     code = input("Please, go to {} and paste code here\n".format(code,))
     p.get_db().execute('UPDATE vk SET token = %s WHERE user = %s', (code, user,)).close()
     token = code
@@ -96,10 +96,35 @@ class User:
 
     albums = dict()
 
-    def _upload(self, url: str, files: dict, album_id: int, user_id: int):
+    def _upload(self, url: str, files, album_id: int, user_id: int):
+        # print(url)
+        # print(files)
+        # print(album_id)
+        # print(user_id)
 
-        # uploadedFiles = b''.decode('string_escape')
-        pass
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 5.1; rv:20.0) Gecko/20100101 Firefox/20.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive'
+        }
+
+        # url = 'http://httpbin.org/post';
+        p = Session()
+        q = p.request('POST', url, files=files, headers=headers)
+
+        if q.status_code == 200:
+            j = q.json()
+            # print('J:')
+            # print(j)
+            # print('')
+            server = str(j['server'])
+            aid = str(j['aid'])
+            hash = str(j['hash'])
+            photos_list = str(bytearray(j['photos_list'], 'utf-8').decode('unicode_escape'))
+            params = 'server=' + server + '&album_id=' + aid + '&hash=' + hash + '&photos_list=' + photos_list
+            request('photos.save', params)
 
     def photosGetAlbums(self):
         data = request('photos.getAlbums', '')
@@ -117,8 +142,9 @@ class User:
 
     def uploadPhotos(self):
         album = vk_config['album']
-        data = request('photos.getUploadServer', 'album_id=' + album)
+        data = request('photos.getUploadServer', 'album_id=' + str(album))
         data = json.loads(data)
+        # print(data)
         if not (isinstance(data, object) and 'response' in data and 'upload_url' in data.get('response')):
             return False
         data = data.get('response')
@@ -129,26 +155,24 @@ class User:
         if not isdir(path):
             return False
         _files = [f for f in listdir(path) if isfile(join(path, f))]
-        print(_files)
+        # print(_files)
         files = []
         for f in _files:
             _, ext = splitext(f)
             if ext in ['.jpeg', '.jpg', '.png']:
                 files.append(f)
-        print(files)
         i = 0
-        _list = {}
+        _list = []
         for f in files:
             if i == 5:
-                i = 0
                 self._upload(url, _list, album, user_id)
-                _list = {}
+                i = 0
+                _list = []
             index = 'file' + str(i+1)
-            _list[index] = open(join(path, f))
+            _list.append((index, open(join(path, f), 'rb')))
             i += 1
         if i != 5:
             self._upload(url, _list, album, user_id)
-
 
 newUser = User()
 # newUser.photosGetAlbums()
