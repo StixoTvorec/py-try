@@ -4,6 +4,7 @@
 import iparser as p
 from requests import Session
 import json
+from time import sleep
 from os import (
     listdir,
     getcwd,
@@ -174,19 +175,25 @@ class User:
                 if i == 5:
                     n += 5
                     self._upload(url, _list)
+                    sleep(1) # на всякий случай
                     for _ in _move:
-                        rename(_, join(uploadedPath, basename(_)))
+                        _[1].close()
+                        rename(_[0], join(uploadedPath, basename(_[0])))
                     print('uploaded ' + str(n) + '/' + str(countFiles))
                     i = 0
                     _list = []
                     _move = []
                 index = 'file' + str(i+1)
-                _list.append((index, open(join(path, f), 'rb'),))
+                fileName = join(path, f)
+                d = open(fileName, 'rb')
+                _list.append((index, ('image.png', d,)))
+                _move.append((fileName, d,))
                 i += 1
             if i != 5:
                 self._upload(url, _list)
                 for _ in _move:
-                    rename(_, join(uploadedPath, basename(_)))
+                    _[1].close()
+                    rename(_[0], join(uploadedPath, basename(_[0])))
             print('uploaded finish')
 
 newUser = User()
