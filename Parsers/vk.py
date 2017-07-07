@@ -127,6 +127,22 @@ class User:
             params = 'server=' + server + '&album_id=' + aid + '&hash=' + hash + '&photos_list=' + photos_list
             request('photos.save', params)
 
+    def deleteAllPhotos(self, album):
+        return False # standalone access need
+        album = str(album)
+        list = request('photos.get', 'album_id=' + album)
+        list = json.loads(list).get('response').get('items')
+        print(' start deleted ' + str(len(list)) + ' photos')
+        sleep(1)
+        for f in list:
+            sleep(.2)
+            id = f.get('id')
+            data = 'owner_id=' + str(user) + '&photo_id=' + str(id)
+            # print('deleting ' + str(id))
+            # print(data)
+            _ = request('photos.delete', data)
+            print(_)
+
     def photosGetAlbums(self):
         data = request('photos.getAlbums', '')
         self.albums = json.loads(data)
@@ -145,6 +161,10 @@ class User:
         if uploadAlbumId == '':
             print('upload_album_id is empty')
             return False
+
+        # if need delete old uploaded photos
+        self.deleteAllPhotos(uploadAlbumId)
+
         data = request('photos.getUploadServer', 'album_id=' + str(uploadAlbumId))
         data = json.loads(data)
         # print(data)
