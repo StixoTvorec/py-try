@@ -18,6 +18,7 @@ from os.path import (
     splitext,
     basename,
 )
+import urllib.request
 
 configFile = './vk_key.json'
 apiVersion = '5.65'
@@ -94,6 +95,11 @@ if token == '':
     _.close()
 
 
+def _safe_downloader(url, file_name):
+    with urllib.request.urlopen(url) as response, open(file_name, 'wb') as out_file:
+        out_file.write(response.read())
+
+
 def request(method: str, more: str = ""):
     url = apiUrl.format(method, apiVersion, token, more)
     return p.Http().get(url)
@@ -143,6 +149,55 @@ class User:
             _ = request('photos.delete', data)
             print(_)
 
+    def downloadPhotos(self, album: str = '', offset: int = 0):
+        if album == '':
+            album = '165962770_saved'
+        owner_id, album_id = album.split('_') if album.find('_') > 0 else ['', '']
+
+        path = join(getcwd(), 'vk_download_files')
+        if not isdir(path):
+            return False
+
+        if album_id == '' or owner_id == '':
+            print('Album or Owner is empty!')
+            print('Please, paste of format <owner>_<album>. Example:' +
+                  ' https://vk.com/album5962770_24571412 =>' +
+                  ' (5962770_24571412 or -5962770_24571412 from groups)')
+            return False
+        if album_id == '000':
+            album_id = 'saved'
+        if album_id == '00':
+            album_id = 'wall'
+        if album_id == '0':
+            album_id = 'profile'
+
+        _ = 'owner_id={}&album_id={}&photo_sizes=1&offset={}'
+        response = request('photos.get', _.format(owner_id,album_id,str(offset),))
+        response = json.loads(response)
+
+        if not (isinstance(response, object) and 'response' in response and 'count' in response.get('response')):
+            print('response error')
+            return False
+
+        response = response.get('response')
+        count = response.get('count')
+        print('Find ' + str(count) + ' photos')
+        if count < 1:
+            return False
+        items = response.get('items')
+        # images = map(lambda x: x.get('sizes')[-1], items)
+        i = 0
+        for f in items:
+            src = f.get('sizes')[-1].get('src')
+            print('Downloading photo # {} ({})'.format((i+offset), src,))
+            name = basename(src)
+            _ = join(path, name)
+            _safe_downloader(src, _)
+            i += 1
+        if count > 999:
+            self.downloadPhotos(album, (offset + int(count)))
+        pass
+
     def photosGetAlbums(self):
         data = request('photos.getAlbums', '')
         self.albums = json.loads(data)
@@ -167,7 +222,6 @@ class User:
 
         data = request('photos.getUploadServer', 'album_id=' + str(uploadAlbumId))
         data = json.loads(data)
-        # print(data)
         if not (isinstance(data, object) and 'response' in data and 'upload_url' in data.get('response')):
             return False
         data = data.get('response')
@@ -219,7 +273,8 @@ class User:
 newUser = User()
 # newUser.photosGetAlbums()
 # newUser.photos()
-newUser.uploadPhotos()
+# newUser.uploadPhotos()
+newUser.downloadPhotos(input("Paste album number\n"))
 exit()
 
 while True:

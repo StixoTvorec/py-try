@@ -1,30 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru" dir="ltr">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="robots" content="noindex">
+    <!--<meta name="referrer" content="origin-when-crossorigin">-->
+    <title>WebSocket chat</title>
+    <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+</head>
+<body>
+<header class="header">
+    <div class=""></div>
+</header>
+<section class="content-wrapper">
+    <div class="section">
+        <div class="messages-list">
+            <div class="message">
+                <div class="meta">
+                    <div class="date-time">03:20:41 10 Jul</div>
+                    <div class="name">Smitt</div>
+                </div>
+                <div class="text">Message text example</div>
+            </div>
+            <div class="message">
+                <div class="meta">
+                    <div class="date-time">03:20:41 10 Jul</div>
+                    <div class="name">Smitt</div>
+                </div>
+                <div class="text">Message text example Message text example Message text example Message text example Message text example Message text example Message text example Message text example Message text example Message text example </div>
+            </div>
+            <div class="message">
+                <div class="meta">
+                    <div class="date-time">03:20:41 10 Jul</div>
+                    <div class="name">Smitt</div>
+                </div>
+                <div class="text">Message text example</div>
+            </div>
+        </div>
+
+        <div class="submit">
+            <div class="input-group">
+                <input name="message" class="message form-control">
+                <button class="send input-group-addon btn btn-outline-success">Send</button>
+            </div>
+        </div>
+    </div>
+
+</section>
+<footer class="footer"></footer>
 <script src="/js/q.min.js"></script>
 <script src="/js/wsrpc.min.js"></script>
+<!--<script defer async src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js" integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn" crossorigin="anonymous"></script>-->
+<script defer async src="/js/common"></script>
 
-<div class=""></div>
-
-<script>
-    var url = (window.location.protocol==="https:"?"wss://":"ws://") + window.location.host + '/ws/';
-    RPC = WSRPC(url, 5000);
-
-    // Инициализируем объект
-    RPC.call('test').then(function (data) {
-        // посылаем аргументы как *args
-        RPC.call('test.serverSideFunction', [1,2,3]).then(function (data) {
-            console.log("Server return", data)
-        });
-
-        // Объект как аргументы **kwargs
-        RPC.call('test.serverSideFunction', {size: 1, id: 2, lolwat: 3}).then(function (data) {
-            console.log("Server return", data)
-        });
-    });
-
-    // Если с сервера придет вызов 'whoAreYou', вызовем следующую функцию
-    // ответим на сервер то, что после return
-    RPC.addRoute('whoAreYou', function (data) {
-        return window.navigator.userAgent;
-    });
-
-    RPC.connect();
-</script>
+</body>
+</html>

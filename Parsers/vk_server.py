@@ -31,7 +31,7 @@ if __name__ == "__main__":
     http_server = tornado.httpserver.HTTPServer(tornado.web.Application((
         # Генерирует url со статикой q.min.js и wsrpc.min.js
         # (подключать в том же порядке)
-        wsrpc_static(r'/js/(.*)'),
+        # wsrpc_static(r'/js/(.*)'),
         (r"/ws/", WebSocket),
         (r'/(.*)', tornado.web.StaticFileHandler, {
              'path': os.path.join(project_root, 'static'),
