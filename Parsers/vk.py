@@ -17,6 +17,7 @@ from os.path import (
     join,
     splitext,
     basename,
+    dirname,
 )
 import urllib.request
 
@@ -96,8 +97,13 @@ if token == '':
 
 
 def _safe_downloader(url, file_name):
-    with urllib.request.urlopen(url) as response, open(file_name, 'wb') as out_file:
+    try:
+        response = urllib.request.urlopen(url)
+        out_file = open(file_name, 'wb')
         out_file.write(response.read())
+        return True
+    except urllib.error.HTTPError:
+        return False
 
 
 def request(method: str, more: str = ""):
@@ -186,16 +192,30 @@ class User:
             return False
         items = response.get('items')
         # images = map(lambda x: x.get('sizes')[-1], items)
-        i = 0
+        i = 1
         for f in items:
             src = f.get('sizes')[-1].get('src')
-            print('Downloading photo # {} ({})'.format((i+offset), src,))
             name = basename(src)
-            _ = join(path, name)
-            _safe_downloader(src, _)
+            dn = basename(dirname(src)) + '0'
+            dn = join(path, dn[0:2])
+            if not isdir(dn) and not (mkdir(dn, 0o777) or isdir(dn)):
+                print('mkdir {} error!'.format(dn,))
+                exit(1)
+            _ = join(dn, name)
+            if isfile(_):
+                i += 1
+                print('Skip {}'.format(name,))
+                continue
+            print('Downloading photo # {}/{} ({})'.format((i+offset), count, src,))
+            if not _safe_downloader(src, _):
+                print('Download failed. Retry.')
+                if _safe_downloader(src, _):
+                    print('Success!')
+                else:
+                    print('Please, download this manual')
             i += 1
-        if count > 999:
-            self.downloadPhotos(album, (offset + int(count)))
+        if len(items) > 999:
+            self.downloadPhotos(album, (offset + len(items)))
         pass
 
     def photosGetAlbums(self):
