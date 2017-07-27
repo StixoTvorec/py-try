@@ -76,11 +76,11 @@ def get_content(uri: str):
 
 
 def download_files(baseroot, images):
-    tempDirectory = get_temp_path()
-    if os.path.isdir(tempDirectory):
-        rmtree(tempDirectory)
-    os.makedirs(tempDirectory)
-    imagesCount = len(images)
+    temp_directory = get_temp_path()
+    if os.path.isdir(temp_directory):
+        rmtree(temp_directory)
+    os.makedirs(temp_directory)
+    images_count = len(images)
     i = 0
 
     archive = os.path.basename(baseroot.strip('/'))
@@ -90,22 +90,23 @@ def download_files(baseroot, images):
         print('Archive ' + archive + ' exist. Skip')
         return
 
-    print('imagesCount:', imagesCount)
+    print('Images count:', images_count)
 
-    while i < imagesCount:
+    while i < images_count:
         name = images[i]
         _url = baseroot + name
         i += 1
 
-        if not _safe_downloader(_url, os.path.join(tempDirectory, name)):
+        if not _safe_downloader(_url, os.path.join(temp_directory, name)):
             print('Warning! Don\'t downloaded file. Retry')
-            if not _safe_downloader(_url, os.path.join(tempDirectory, name)):
+            if not _safe_downloader(_url, os.path.join(temp_directory, name)):
                 print('Error downloading %s' % _url, stderr)
+                return
 
     archive = zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED)
 
-    for f in os.listdir(tempDirectory):
-        file = os.path.join(tempDirectory, f)
+    for f in os.listdir(temp_directory):
+        file = os.path.join(temp_directory, f)
         if os.path.isfile(file):
             archive.write(file, f)
     archive.close()
@@ -155,21 +156,21 @@ def main():
 
     print('Start downloading manga %s' % (name))
 
-    pageContent = str(get_content(url))
-    volumesLinks = get_volumes_links(pageContent)
-    volumesCount = len(volumesLinks)
+    page_content = str(get_content(url))
+    volumes_links = get_volumes_links(page_content)
+    volumes_count = len(volumes_links)
 
-    if volumesCount < 1:
+    if volumes_count < 1:
         print('Volumes not found. Exit', stderr)
         exit(1)
 
-    volumesLinks.reverse()  # reverse DESC order
+    volumes_links.reverse()  # reverse DESC order
 
-    print('Volumes count: %d' % volumesCount)
+    print('Volumes count: %d' % volumes_count)
     loop = 0
-    while loop < volumesCount:
+    while loop < volumes_count:
         print('Start downloading volume %d' % loop)
-        test_url = volumesLinks[loop]
+        test_url = volumes_links[loop]
         loop += 1
         _url = (domainUri + test_url) if test_url.find(domainUri) < 0 else test_url
         content = get_content(_url)
