@@ -83,6 +83,13 @@ def download_files(baseroot, images):
     imagesCount = len(images)
     i = 0
 
+    archive = os.path.basename(baseroot.strip('/'))
+    archive = os.path.join(archivesDir, archive + '.zip')
+
+    if os.path.isfile(archive):
+        print('Archive ' + archive + ' exist. Skip')
+        return
+
     print('imagesCount:', imagesCount)
 
     while i < imagesCount:
@@ -95,9 +102,7 @@ def download_files(baseroot, images):
             if not _safe_downloader(_url, os.path.join(tempDirectory, name)):
                 print('Error downloading %s' % _url, stderr)
 
-    archive = os.path.basename(baseroot.strip('/'))
-
-    archive = zipfile.ZipFile(os.path.join(archivesDir, archive + '.zip'), 'w', zipfile.ZIP_DEFLATED)
+    archive = zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED)
 
     for f in os.listdir(tempDirectory):
         file = os.path.join(tempDirectory, f)
