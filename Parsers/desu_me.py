@@ -61,7 +61,7 @@ def get_temp_path(path: str = ''):
     rnd_dir = os.path.join(tempfile.gettempdir(), rnd_temp_path)
     if not os.path.isdir(rnd_dir):
         os.makedirs(rnd_dir)
-    return rnd_dir if path == '' else os.path.join(rnd_dir, path)
+    return os.path.join(rnd_dir, path)
 
 
 def get_content(uri: str):
@@ -75,7 +75,7 @@ def get_content(uri: str):
     return result
 
 
-def download_files(baseroot, images):
+def download_files(baseroot, images, subfolder: str = ''):
     temp_directory = get_temp_path()
     if os.path.isdir(temp_directory):
         rmtree(temp_directory)
@@ -84,7 +84,7 @@ def download_files(baseroot, images):
     i = 0
 
     archive = os.path.basename(baseroot.strip('/'))
-    archive = os.path.join(archivesDir, archive + '.zip')
+    archive = os.path.join(archivesDir, subfolder, archive + '.zip')
 
     if os.path.isfile(archive):
         print('Archive ' + archive + ' exist. Skip')
@@ -183,7 +183,7 @@ def main():
             print('Warning get images list')
             continue
         _url = _url.groups()[0].replace('\/', '/')
-        download_files(_url, images)
+        download_files(_url, images, name)
 
 
 if __name__ == '__main__':
