@@ -14,10 +14,10 @@ import json
 from sys import stderr
 from shutil import rmtree
 
-domainUri = 'http://desu.me'
-uriRegex = 'https?://(?:www\.)?desu\.me/manga/(.*?)/'
-imagesDirRegex = 'dir:\s?"(.*)"'
-imagesRegex = 'images:\s?(\[\[.+\]\])'
+domainUri = 'http://readmanga.me'
+uriRegex = 'https?://(?:www\.)?readmanga\.me/(.*?)/'
+# imagesDirRegex = 'servers\s?=\s?"(.*)"'
+imagesRegex = 'rm_h\.init.+?(\[\[.+\]\])'
 archivesDir = os.path.join(os.getcwd(), 'manga')
 
 rnd_temp_path = str(random.random())
@@ -75,7 +75,7 @@ def get_content(uri: str):
     return result
 
 
-def download_files(baseroot, images, subfolder: str = ''):
+def download_files(images, archiveName: str, subfolder: str = ''):
     temp_directory = get_temp_path()
     if os.path.isdir(temp_directory):
         rmtree(temp_directory)
@@ -83,8 +83,9 @@ def download_files(baseroot, images, subfolder: str = ''):
     images_count = len(images)
     i = 0
 
-    archive = os.path.basename(baseroot.strip('/'))
-    archive = os.path.join(archivesDir, subfolder, archive + '.zip')
+    archive = os.path.join(archivesDir, subfolder, archiveName + '.zip')
+    print(archive)
+    exit()
 
     if os.path.isfile(archive):
         print('Archive ' + archive + ' exist. Skip')
@@ -93,8 +94,8 @@ def download_files(baseroot, images, subfolder: str = ''):
     print('Images count:', images_count)
 
     while i < images_count:
-        name = images[i]
-        _url = baseroot + name
+        _url = images[i]
+        name = os.path.basename(_url)
         i += 1
 
         if not _safe_downloader(_url, os.path.join(temp_directory, name)):
@@ -116,7 +117,7 @@ def get_manga_images(content):
     result = re.search(imagesRegex, content, re.M)
     if result is None:
         return []
-    result = [i[0] for i in json.loads(result.groups()[0])]
+    result = [i[1] + i[0] + i[2] for i in json.loads(result.groups()[0].replace("'", '"'))]
     return result
 
 
@@ -126,14 +127,14 @@ def get_volumes_links(content: str):
     :return: dict
     """
     parser = html.document_fromstring(content)
-    result = parser.cssselect('#animeView ul h4 > a.tips')
+    result = parser.cssselect('#mangaBox > div.leftContent div.chapters-link tr > td > a')
     if result is None:
         return []
     return [i.get('href') for i in result]
 
 
 def get_manga_name(url):
-    if url.find('desu.me') < 0:
+    if url.find('readmanga.me') < 0:
         return ''
     result = re.match(uriRegex, url)
     if result is None:
@@ -146,8 +147,9 @@ def get_manga_name(url):
 
 def main():
     print('Please, paste desu.me manga url.')
-    print('Example: http://desu.me/manga/name-manga.0/')
-    url = input()
+    print('Example: http://readmanga.me/name-manga/')
+    # url = input()
+    url = 'http://readmanga.me/toradora/'
     name = get_manga_name(url)
 
     if not len(name):
@@ -175,15 +177,10 @@ def main():
         _url = (domainUri + test_url) if test_url.find(domainUri) < 0 else test_url
         content = get_content(_url)
         images = get_manga_images(content)
-        _url = re.search(imagesDirRegex, content, re.M)
-        if _url is None:
-            print('Warning get images server url')
-            continue
         if images is None:
             print('Warning get images list')
             continue
-        _url = _url.groups()[0].replace('\/', '/')
-        download_files(_url, images, name)
+        download_files(images, 'part_' + loop, name)
 
 
 if __name__ == '__main__':
