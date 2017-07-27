@@ -169,7 +169,7 @@ def main():
     print('Volumes count: %d' % volumes_count)
     loop = 0
     while loop < volumes_count:
-        print('Start downloading volume %d' % loop)
+        print('Start downloading volume %d' % (loop+1))
         test_url = volumes_links[loop]
         loop += 1
         _url = (domainUri + test_url) if test_url.find(domainUri) < 0 else test_url
