@@ -25,11 +25,11 @@ rnd_temp_path = str(random.random())
 
 if not os.path.isdir(archivesDir):
     if not os.access(os.getcwd(), os.W_OK):
-        print('Current directory not writeable and manga directory not exist', stderr)
+        print('Current directory not writeable and manga directory not exist', file=stderr)
         exit(1)
     os.makedirs(archivesDir)
 elif not os.access(archivesDir, os.W_OK):
-    print('Manga directory not writable', stderr)
+    print('Manga directory not writable', file=stderr)
     exit(1)
 
 
@@ -100,7 +100,7 @@ def download_files(baseroot, images, subfolder: str = ''):
         if not _safe_downloader(_url, os.path.join(temp_directory, name)):
             print('Warning! Don\'t downloaded file. Retry')
             if not _safe_downloader(_url, os.path.join(temp_directory, name)):
-                print('Error downloading %s' % _url, stderr)
+                print('Error downloading %s' % _url, file=stderr)
                 return
 
     archive = zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED)
@@ -149,7 +149,7 @@ def main():
     name = get_manga_name(url)
 
     if not len(name):
-        print('Error url. Exit', stderr)
+        print('Error url. Exit', file=stderr)
         exit(1)
 
     print('Start downloading manga %s' % (name))
@@ -159,7 +159,7 @@ def main():
     volumes_count = len(volumes_links)
 
     if volumes_count < 1:
-        print('Volumes not found. Exit', stderr)
+        print('Volumes not found. Exit', file=stderr)
         exit(1)
 
     volumes_links.reverse()  # reverse DESC order
