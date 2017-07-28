@@ -15,7 +15,7 @@ from sys import stderr
 from shutil import rmtree
 
 domainUri = 'http://desu.me'
-uriRegex = 'https?://(?:www\.)?desu\.me/manga/(.*?)/'
+uriRegex = 'https?://(?:www\.)?desu\.me/manga/([^/]+)/?'
 imagesDirRegex = 'dir:\s?"(.*)"'
 imagesRegex = 'images:\s?(\[\[.+\]\])'
 archivesDir = os.path.join(os.getcwd(), 'manga')
@@ -133,8 +133,6 @@ def get_volumes_links(content: str):
 
 
 def get_manga_name(url):
-    if url.find('desu.me') < 0:
-        return ''
     result = re.match(uriRegex, url)
     if result is None:
         return ''
@@ -147,7 +145,7 @@ def get_manga_name(url):
 def main():
     print('Please, paste desu.me manga url.')
     print('Example: http://desu.me/manga/name-manga.0/')
-    url = input()
+    url = str(input())
     name = get_manga_name(url)
 
     if not len(name):

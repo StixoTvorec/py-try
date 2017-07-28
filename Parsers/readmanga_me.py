@@ -15,7 +15,7 @@ from sys import stderr
 from shutil import rmtree
 
 domainUri = 'http://readmanga.me'
-uriRegex = 'https?://(?:www\.)?readmanga\.me/(.*?)/'
+uriRegex = 'https?://(?:www\.)?readmanga\.me/([^/]+)/?'
 # imagesDirRegex = 'servers\s?=\s?"(.*)"'
 imagesRegex = 'rm_h\.init.+?(\[\[.+\]\])'
 archivesDir = os.path.join(os.getcwd(), 'manga')
@@ -84,12 +84,14 @@ def download_files(images, archiveName: str, subfolder: str = ''):
     i = 0
 
     archive = os.path.join(archivesDir, subfolder, archiveName + '.zip')
-    print(archive)
-    exit()
 
     if os.path.isfile(archive):
         print('Archive ' + archive + ' exist. Skip')
         return
+
+    _dirname = os.path.dirname(archive)
+    if not os.path.isdir(_dirname):
+        os.makedirs(_dirname)
 
     print('Images count:', images_count)
 
@@ -134,8 +136,6 @@ def get_volumes_links(content: str):
 
 
 def get_manga_name(url):
-    if url.find('readmanga.me') < 0:
-        return ''
     result = re.match(uriRegex, url)
     if result is None:
         return ''
@@ -148,8 +148,8 @@ def get_manga_name(url):
 def main():
     print('Please, paste desu.me manga url.')
     print('Example: http://readmanga.me/name-manga/')
-    # url = input()
-    url = 'http://readmanga.me/toradora/'
+    url = str(input())
+    # url = 'http://readmanga.me/mushishi'
     name = get_manga_name(url)
 
     if not len(name):
@@ -180,7 +180,13 @@ def main():
         if images is None:
             print('Warning get images list')
             continue
-        download_files(images, 'part_' + loop, name)
+        archiveName = re.search('/.+/(.+)/(.+)', test_url)
+        if archiveName is None:
+            archiveName = 'part_{:0>4}'.format(loop)
+        else:
+            _ = archiveName.groups()
+            archiveName = "{}_{:0>3}".format(_[0], _[1])
+        download_files(images, archiveName, name)
 
 
 if __name__ == '__main__':
