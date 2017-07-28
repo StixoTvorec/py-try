@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from requests import get as get_request
+from requests import post as post_request
 import lxml.html as html
 import zipfile
 from urllib import request as url_request
@@ -14,8 +15,8 @@ import json
 from sys import stderr
 from shutil import rmtree
 
-domainUri = 'http://readmanga.me'
-uriRegex = 'https?://(?:www\.)?readmanga\.me/([^/]+)/?'
+domainUri = 'http://shakai.ru'
+uriRegex = 'https?://(?:www\.)?shakai\.ru/manga(?:-read)/(\d+)/?'
 # imagesDirRegex = 'servers\s?=\s?"(.*)"'
 imagesRegex = 'rm_h\.init.+?(\[\[.+\]\])'
 archivesDir = os.path.join(os.getcwd(), 'manga')
@@ -39,6 +40,20 @@ def _get(filename: str, offset: int = -1, maxlen: int = -1, headers: dict=None, 
     if not cookies:
         cookies = ()
     response = get_request(filename, headers=headers, cookies=cookies)
+    ret = response.text
+    if offset > 0:
+        ret = ret[offset:]
+    if maxlen > 0:
+        ret = ret[:maxlen]
+    return ret
+
+
+def _post(filename: str, offset: int = -1, maxlen: int = -1, headers: dict=None, cookies: dict=None, data: dict = ()):
+    if not headers:
+        headers = {}
+    if not cookies:
+        cookies = ()
+    response = post_request(filename, headers=headers, cookies=cookies, data=data)
     ret = response.text
     if offset > 0:
         ret = ret[offset:]
@@ -115,14 +130,6 @@ def download_files(images, archiveName: str, subfolder: str = ''):
     archive.close()
 
 
-def get_manga_images(content):
-    result = re.search(imagesRegex, content, re.M)
-    if result is None:
-        return []
-    result = [i[1] + i[0] + i[2] for i in json.loads(result.groups()[0].replace("'", '"'))]
-    return result
-
-
 def get_volumes_links(content: str):
     """
     :param content: str
@@ -146,10 +153,10 @@ def get_manga_name(url):
 
 
 def main():
-    print('Please, paste desu.me manga url.')
-    print('Example: http://readmanga.me/name-manga/')
+    print('Please, paste shakai.ru manga url.')
+    print('Example: http://shakai.ru/manga/123/')
     url = str(input())
-    # url = 'http://readmanga.me/mushishi'
+    # url = 'http://shakai.ru/manga/123'
     name = get_manga_name(url)
 
     if not len(name):
@@ -158,35 +165,35 @@ def main():
 
     print('Start downloading manga %s' % (name))
 
-    page_content = str(get_content(url))
-    volumes_links = get_volumes_links(page_content)
+    _ = {
+        'dataRun': 'api-manga',
+        'dataRequest': name
+    }
+    page_content = json.loads(str(_post('http://shakai.ru/take/api-manga/request/shakai', data=_)))
+
+    if page_content is None or 'data' not in page_content:
+        print('Response error', file=stderr)
+        exit(1)
+
+    volumes_links = page_content['data']
     volumes_count = len(volumes_links)
 
     if volumes_count < 1:
         print('Volumes not found. Exit', file=stderr)
         exit(1)
 
-    volumes_links.reverse()  # reverse DESC order
-
     print('Volumes count: %d' % volumes_count)
     loop = 0
     while loop < volumes_count:
         print('Start downloading volume %d' % (loop+1))
-        test_url = volumes_links[loop]
+        data = volumes_links[loop]
         loop += 1
-        _url = (domainUri + test_url) if test_url.find(domainUri) < 0 else test_url
-        content = get_content(_url)
-        images = get_manga_images(content)
+        archive_name = name + '_' + data['data-first']
+        images = data['data-second']
         if images is None:
             print('Warning get images list')
             continue
-        archive_name = re.search('/.+/(.+)/(.+)', test_url)
-        if archive_name is None:
-            archive_name = 'part_{:0>4}'.format(loop)
-        else:
-            _ = archive_name.groups()
-            archive_name = "{}_{:0>3}".format(_[0], _[1])
-        download_files(images, archive_name, name)
+        download_files(images, archive_name, 'shakai_' + name)
 
 
 if __name__ == '__main__':
