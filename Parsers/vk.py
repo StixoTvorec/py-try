@@ -1,10 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-import iparser as p
-from requests import Session
 import json
-from time import sleep
 from os import (
     listdir,
     getcwd,
@@ -19,7 +16,12 @@ from os.path import (
     basename,
     dirname,
 )
-import urllib.request
+from threading import Thread
+from time import sleep
+from urllib import error as request_error
+from urllib.request import urlopen
+
+from requests import Session
 
 configFile = './vk_key.json'
 apiVersion = '5.65'
@@ -52,12 +54,12 @@ access = (
     + 262144
 )
 
-vk_config = p.get_content(configFile)
-if len(vk_config) < 1:
+try:
+    with open(configFile, 'rb') as _config:
+        vk_config = json.loads(_config.read().decode('utf-8'))
+except Exception:
     print('Error. No config file!')
-    exit(0)
-
-vk_config = json.loads(vk_config.decode('utf-8'))
+    exit(1)
 
 if not (
         isinstance(vk_config, object)
@@ -73,7 +75,7 @@ uploadAlbumId = vk_config['album']
 
 user = vk_config['user_id'] #int(input("Input you user id: \n"))
 
-if int(user) < 0:
+if not user or int(user) < 0:
     print('Error!')
     exit(1)
 
@@ -92,25 +94,50 @@ if token == '':
       "token": token
     }
     _ = open(configFile, 'wb')
-    _.write(json.dumps(data))
+    _.write(json.dumps(data).encode())
     _.close()
 
 
 def _safe_downloader(url, file_name):
-    try:
-        response = urllib.request.urlopen(url)
-        out_file = open(file_name, 'wb')
-        out_file.write(response.read())
-        return True
-    except urllib.error.HTTPError:
-        return False
+    while True:
+        try:
+            response = urlopen(url)
+            out_file = open(file_name, 'wb')
+            out_file.write(response.read())
+            return True
+        except request_error.HTTPError:
+            return False
+        except request_error.URLError:
+            sleep(1)
+            pass
 
 
 def request(method: str, more: str = ""):
     url = apiUrl.format(method, apiVersion, token, more)
-    return p.Http().get(url)
+    r = urlopen(url)
+    return r.read().decode('utf-8')
 
-print("User: {}\nToken: {}\nUserId: {}\n".format(id, token, user,))
+
+print("User: {}\nToken: {}\nUserId: {}\n".format(id, 'secret', user,))
+
+
+class MultiThreads:
+
+    threads = []
+
+    def __init__(self):
+        self.threads = []
+
+    def addThread(self, target: callable, args: tuple):
+        self.threads.append(Thread(target=target, args=args))
+
+    def startAll(self):
+        for t in self.threads:  # starting all threads
+            t.start()
+        for t in self.threads:  # joining all threads
+            t.join()
+        self.threads = []
+
 
 class User:
 
@@ -157,7 +184,7 @@ class User:
 
     def downloadPhotos(self, album: str = '', offset: int = 0):
         if album == '':
-            album = '165962770_saved'
+            album = '-89187086_212174609'
         owner_id, album_id = album.split('_') if album.find('_') > 0 else ['', '']
 
         path = join(getcwd(), 'vk_download_files')
@@ -181,7 +208,7 @@ class User:
         response = request('photos.get', _.format(owner_id,album_id,str(offset),))
         response = json.loads(response)
 
-        if not (isinstance(response, object) and 'response' in response and 'count' in response.get('response')):
+        if 'response' not in response or 'count' not in response.get('response'):
             print('response error')
             return False
 
@@ -193,27 +220,37 @@ class User:
         items = response.get('items')
         # images = map(lambda x: x.get('sizes')[-1], items)
         i = 1
+        threads = MultiThreads()
         for f in items:
             src = f.get('sizes')[-1].get('src')
             name = basename(src)
             dn = basename(dirname(src)) + '0'
+            _dn = basename(dirname(dirname(src))) + '0'
+            _subname = dn[2:-1] + _dn
             dn = join(path, dn[0:2])
             if not isdir(dn) and not (mkdir(dn, 0o777) or isdir(dn)):
-                print('mkdir {} error!'.format(dn,))
+                print('mkdir {} error!'.format(dn))
                 exit(1)
-            _ = join(dn, name)
+            _ = join(dn, _subname + name)
             if isfile(_):
                 i += 1
                 print('Skip {}'.format(name,))
                 continue
             print('Downloading photo # {}/{} ({})'.format((i+offset), count, src,))
-            if not _safe_downloader(src, _):
-                print('Download failed. Retry.')
-                if _safe_downloader(src, _):
-                    print('Success!')
-                else:
-                    print('Please, download this manual')
+
+            threads.addThread(_safe_downloader, (src, _))
+
+            # if not _safe_downloader(src, _):
+            #     print('Download failed. Retry.')
+            #     if _safe_downloader(src, _):
+            #         print('Success!')
+            #     else:
+            #         print('Please, download this manual')
             i += 1
+            if i % 50 == 0:
+                threads.startAll()
+        threads.startAll()
+
         if len(items) > 999:
             self.downloadPhotos(album, (offset + len(items)))
         pass
