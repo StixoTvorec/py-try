@@ -5,7 +5,7 @@ import json
 from os import (
     listdir,
     getcwd,
-    mkdir,
+    makedirs,
     rename,
 )
 from os.path import (
@@ -20,8 +20,16 @@ from threading import Thread
 from time import sleep
 from urllib import error as request_error
 from urllib.request import urlopen
+import hashlib
 
 from requests import Session
+from argparse import ArgumentParser
+
+_args = ArgumentParser()
+_args.add_argument('-m', help='Method', type=str, required=False, default='')
+_args.add_argument('--hide', help='Hidden', action='store_const', required=False, const=True, default=False)
+# _args.add_argument('-f', help='File', type=str, required=False, default='tts.txt')
+args = _args.parse_args()
 
 configFile = './vk_key.json'
 apiVersion = '5.65'
@@ -118,7 +126,8 @@ def request(method: str, more: str = ""):
     return r.read().decode('utf-8')
 
 
-print("User: {}\nToken: {}\nUserId: {}\n".format(id, 'secret', user,))
+if not args.hide:
+    print("User: {}\nToken: {}\nUserId: {}\n".format(id, 'secret', user,))
 
 
 class MultiThreads:
@@ -184,7 +193,7 @@ class User:
 
     def downloadPhotos(self, album: str = '', offset: int = 0):
         if album == '':
-            album = '-89187086_212174609'
+            album = '-1_wall'
         owner_id, album_id = album.split('_') if album.find('_') > 0 else ['', '']
 
         path = join(getcwd(), 'vk_download_files')
@@ -204,7 +213,7 @@ class User:
         if album_id == '0':
             album_id = 'profile'
 
-        _ = 'owner_id={}&album_id={}&photo_sizes=1&offset={}'
+        _ = 'owner_id={}&album_id={}&photo_sizes=1&offset={}&count=1000'
         response = request('photos.get', _.format(owner_id,album_id,str(offset),))
         response = json.loads(response)
 
@@ -214,49 +223,49 @@ class User:
 
         response = response.get('response')
         count = response.get('count')
-        print('Find ' + str(count) + ' photos')
+        if not args.hide:
+            print('Find ' + str(count) + ' photos')
         if count < 1:
             return False
         items = response.get('items')
         # images = map(lambda x: x.get('sizes')[-1], items)
         i = 1
+        _items = [{'items': len(items)}]
         threads = MultiThreads()
+        dn = join(path, owner_id, album_id)
+        if not isdir(dn) and not (makedirs(dn, 0o777, True) or isdir(dn)):
+            print('mkdir {} error!'.format(dn))
+            exit(1)
         for f in items:
             src = f.get('sizes')[-1].get('src')
-            name = basename(src)
-            dn = basename(dirname(src)) + '0'
-            _dn = basename(dirname(dirname(src))) + '0'
-            _subname = dn[2:-1] + _dn
-            dn = join(path, dn[0:2])
-            if not isdir(dn) and not (mkdir(dn, 0o777) or isdir(dn)):
-                print('mkdir {} error!'.format(dn))
-                exit(1)
-            _ = join(dn, _subname + name)
+            m = hashlib.sha256()
+            m.update(src.encode())
+            h = m.hexdigest()
+            _items.append({'src': h})
+            _ = join(dn, h + '.' + src.split('.')[-1])
             if isfile(_):
                 i += 1
-                print('Skip {}'.format(name,))
+                if not args.hide:
+                    print('Skip {}'.format(_))
                 continue
-            print('Downloading photo # {}/{} ({})'.format((i+offset), count, src,))
+            if not args.hide:
+                print('Downloading photo # {}/{} ({})'.format((i+offset), count, src,))
 
             threads.addThread(_safe_downloader, (src, _))
 
-            # if not _safe_downloader(src, _):
-            #     print('Download failed. Retry.')
-            #     if _safe_downloader(src, _):
-            #         print('Success!')
-            #     else:
-            #         print('Please, download this manual')
             i += 1
             if i % 50 == 0:
                 threads.startAll()
         threads.startAll()
 
+        with open('{}/_{}'.format(dn, offset), 'w') as it:
+            it.write(json.dumps(_items))
+
         if len(items) > 999:
             self.downloadPhotos(album, (offset + len(items)))
-        pass
 
-    def photosGetAlbums(self):
-        data = request('photos.getAlbums', '')
+    def photosGetAlbums(self, owner_id: str = 0):
+        data = request('photos.getAlbums', 'owner_id=' + owner_id)
         self.albums = json.loads(data)
         return data
 
@@ -288,7 +297,7 @@ class User:
             return False
         uploadedPath = join(path, 'uploaded')
         if not isdir(uploadedPath):
-            mkdir(uploadedPath, 0o777)
+            makedirs(uploadedPath, 0o777, True)
         _files = [f for f in listdir(path) if isfile(join(path, f))]
         files = []
         for f in _files:
@@ -301,7 +310,8 @@ class User:
         _list = []
         _move = []
         if countFiles > 0:
-            print('uploading start')
+            if not args.hide:
+                print('uploading start')
             for f in files:
                 if i == 5:
                     n += 5
@@ -325,19 +335,30 @@ class User:
                 for _ in _move:
                     _[1].close()
                     rename(_[0], join(uploadedPath, basename(_[0])))
-            print('uploaded finish')
+            if not args.hide:
+                print('uploaded finish')
 
 newUser = User()
 # newUser.photosGetAlbums()
 # newUser.photos()
 # newUser.uploadPhotos()
-newUser.downloadPhotos(input("Paste album number\n"))
+# newUser.downloadPhotos(input("Paste album number\n"))
+# exit()
+
+if args.m:
+    method = args.m
+else:
+    method = input("Method: \n")
+# moreParams = input("More params: \n")
+if method == '-1':
+    newUser.downloadPhotos(input("Paste album number\n"))
+if method == '-2':
+    owner_id = input("Paste owner id\n")
+    newUser.photosGetAlbums(owner_id)
+    for i in newUser.albums['response']['items']:
+        print(owner_id + '_' + str(i['id']))
+
 exit()
 
-while True:
-    method = input("Method: \n")
-    # moreParams = input("More params: \n")
-    if method == -1:
-        break
-    m = getattr(newUser, method)
-    print(json.dumps(json.loads(m()), sort_keys=True, indent=4))
+m = getattr(newUser, method)
+print(json.dumps(json.loads(m()), sort_keys=True, indent=4))
