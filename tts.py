@@ -44,12 +44,17 @@ class TTS(gTTS):
                 # Filter out urllib3's insecure warnings. We can live without ssl verify here
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", category=InsecureRequestWarning)
-                    r = requests.get(self.GOOGLE_TTS_URL,
-                                     params=payload,
-                                     headers=headers,
-                                     proxies=urllib.request.getproxies(),
-                                     timeout=self.TIMEOUT,
-                                     verify=False)
+                    while True:
+                        try:
+                            r = requests.get(self.GOOGLE_TTS_URL,
+                                             params=payload,
+                                             headers=headers,
+                                             proxies=urllib.request.getproxies(),
+                                             timeout=self.TIMEOUT,
+                                             verify=False)
+                            break
+                        except requests.exceptions.ReadTimeout:
+                            break
                 if self.debug:
                     print("Headers: {}".format(r.request.headers))
                     print("Request url: {}".format(r.request.url))
