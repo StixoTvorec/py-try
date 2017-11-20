@@ -7,7 +7,7 @@ import time
 from os import remove
 from argparse import ArgumentParser
 
-import requests, warnings
+import re, requests, warnings
 from six.moves import urllib
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -59,6 +59,19 @@ class TTS(gTTS):
                     fp.write(chunk)
             except Exception as e:
                 raise
+
+    def _tokenize(self, text, max_size):
+        """ Tokenizer on basic punctuation """
+
+        punc = "¡!()[]¿?.،;:—。、：？！\n"
+        punc_list = [re.escape(c) for c in punc]
+        pattern = '|'.join(punc_list)
+        parts = re.split(pattern, text)
+
+        min_parts = []
+        for p in parts:
+            min_parts += self._minimize(p, " ", max_size)
+        return min_parts
 
 
 def play(file):
