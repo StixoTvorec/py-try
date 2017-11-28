@@ -17,6 +17,63 @@ _args.add_argument('--temp-file', help='Temp file', type=str, required=False, de
 _args.add_argument('-f', help='File', type=str, required=False, default='tts.txt')
 args = _args.parse_args()
 
+"""
+vk functions:
+
+# getAllUserPhotos
+var user = Args.user;
+var maxCount = 1000;
+// принимает строку вида: 1:40,2:45,4:455
+// где первый параметр - альбом, а второй - количество фоток в нем
+// преобразуется в: [['1', '40'], ['2', '45'], ['4', '455']]
+var albums = Args.albums;
+if(!albums) {
+    return null;
+}
+albums = albums.split(",")@.split(":");
+var i = 0;
+var photos = [];
+var api;
+while(i < albums.length) {
+    var offset = 0;
+    //todo %1000
+    while(offset < albums[i][1]) {
+        api = API.photos.get({
+            owner_id: user,
+            album_id: albums[i][0],
+            offset: offset,
+            count: maxCount
+        });
+        var _photos = api.items@.id;
+        photos.push(_photos);
+        offset = offset + maxCount;
+    }
+    i=i+1;
+}
+return photos;
+# getAllUserPhotos
+
+# photosMove
+var photos = Args.photos.split(",");
+var to = Args.to;
+var owner = Args.owner_id;
+if(!photos || !to) {
+    return null;
+}
+var i = 0;
+while(i < photos.length) {
+    API.photos.move({
+        owner_id: owner,
+        target_album_id: to,
+        photo_id: photos[i],
+    });
+    i = i + 1;
+}
+return i;
+# photosMove
+
+"""
+
 
 class TTS(gTTS):
     MAX_CHARS = 199
