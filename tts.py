@@ -19,7 +19,7 @@ args = _args.parse_args()
 
 
 class TTS(gTTS):
-    MAX_CHARS = 200
+    MAX_CHARS = 199
     TIMEOUT = 2
 
     def write_to_fp(self, fp):
@@ -80,7 +80,7 @@ class TTS(gTTS):
 
 
 def play(file):
-    pygame.mixer.pre_init(28000, 16, 2, 2048)
+    pygame.mixer.pre_init(30000, -16, 2, 2048)
     pygame.init()
 
     n = 1
@@ -96,10 +96,10 @@ def play(file):
             while pygame.mixer.music.get_busy():
                 time.sleep(1)
 
-            tts = TTS(text=t, lang='ru', slow=False, debug=True)
+            tts = TTS(text=t, lang='ru', slow=False, debug=False)
             tts.save(args.temp_file)
 
-            print('playing {}'.format(n))
+            print('playing {}'.format(n - 1))
 
             try:
                 pygame.mixer.music.load(args.temp_file)

@@ -278,6 +278,30 @@ class User:
         data = request('execute.getAllUserPhotos', '')
         return data
 
+    def movePhotos(self):
+        to = '249511389'
+        data = json.loads(request('execute.getAllUserPhotos', 'user={}&albums=saved:6000'.format(user)))
+
+        def _(ids):
+            if not len(ids):
+                return None
+            return request('execute.photosMove', 'photos={}&to={}&owner_id={}'.format(','.join(ids), to, user))
+
+        if data:
+            # % 25
+            items = []
+            for i in data['response']:
+                items += i
+            ids = []
+            for i, j in enumerate(items):
+                if i % 25 == 0:
+                    _(ids)
+                    print('sleep 3sec. loop %d' % i)
+                    sleep(3)
+                    ids = []
+                ids.append('%d' % j)
+            _(ids)
+
     def uploadPhotos(self):
         if uploadAlbumId == '':
             print('upload_album_id is empty')
@@ -357,6 +381,8 @@ if method == '-2':
     newUser.photosGetAlbums(owner_id)
     for i in newUser.albums['response']['items']:
         print(owner_id + '_' + str(i['id']))
+if method == '-3':
+    newUser.movePhotos()
 
 exit()
 
