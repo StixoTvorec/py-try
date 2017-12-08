@@ -20,6 +20,7 @@ from threading import Thread
 from time import sleep
 from urllib import error as request_error
 from urllib.request import urlopen
+from urllib.request import Request
 import hashlib
 
 from requests import Session
@@ -175,22 +176,6 @@ class User:
             params = 'server=' + server + '&album_id=' + aid + '&hash=' + hash + '&photos_list=' + photos_list
             request('photos.save', params)
 
-    def deleteAllPhotos(self, album):
-        return False # standalone access need
-        album = str(album)
-        list = request('photos.get', 'album_id=' + album)
-        list = json.loads(list).get('response').get('items')
-        print(' start deleted ' + str(len(list)) + ' photos')
-        sleep(1)
-        for f in list:
-            sleep(.2)
-            id = f.get('id')
-            data = 'owner_id=' + str(user) + '&photo_id=' + str(id)
-            # print('deleting ' + str(id))
-            # print(data)
-            _ = request('photos.delete', data)
-            print(_)
-
     def downloadPhotos(self, album: str = '', offset: int = 0):
         if album == '':
             album = '-1_wall'
@@ -278,29 +263,83 @@ class User:
         data = request('execute.getAllUserPhotos', '')
         return data
 
-    def movePhotos(self):
-        to = '249511389'
+    def _movePhotos(self, to, items):
+        def _(_ids):
+            if not len(_ids):
+                return None
+            return request('execute.photosMove', 'photos={}&to={}&owner_id={}'.format(','.join(_ids), to, user))
+
+        ids = []
+        for i, j in enumerate(items):
+            if i and i % 25 == 0:
+                sleep(2)
+                _(ids)
+                print('sleep 2sec. loop %d' % i)
+                ids = []
+            ids.append('%d' % j)
+        sleep(2)
+        _(ids)
+
+    def _deletePhotos(self, items):
+        def _(_ids):
+            if not len(_ids):
+                return None
+            return request('execute.deletePhotos', 'photos={}&owner={}'.format(','.join(_ids), user))
+
+        ids = []
+        for i, j in enumerate(items):
+            if i and i % 25 == 0:
+                sleep(2)
+                _(ids)
+                print('sleep 2sec. loop %d' % i)
+                ids = []
+            ids.append('%d' % j)
+        sleep(3)
+        _(ids)
+
+    def _copyPhotos(self, items, owner):
+        from captcha_decoder import decoder
+        def _(_ids):
+            if not len(_ids):
+                return []
+            return request('execute.photosCopy', 'photos={}&owner_id={}'.format(','.join(_ids), owner))
+
+        _items = []
+        ids = []
+        for i, j in enumerate(items):
+            if i and i % 25 == 0:
+                sleep(2)
+                __ = json.loads(_(ids))
+                error = __.get('error', '')
+                if error:
+                    print(error['error_msg'])
+                    print('try solving')
+                    captcha_sid = __.get('captcha_sid')
+                    captcha_img = __.get('captcha_img')
+
+                    print(decoder(path/to/image))
+
+                    sleep(20)
+                _items += __.get('response', [])
+                print('sleep 2sec. loop %d' % i)
+                ids = []
+            ids.append('%d' % j)
+        sleep(2)
+        __ = json.loads(_(ids))
+        error = __.get('error', '')
+        if error:
+            print(error)
+        _items += __.get('response', [])
+        print(_items)
+        exit()
+        return _items
+
+    def movePhotos(self, ids=None):
+        to = '249795469'
         data = json.loads(request('execute.getAllUserPhotos', 'user={}&albums=saved:6000'.format(user)))
 
-        def _(ids):
-            if not len(ids):
-                return None
-            return request('execute.photosMove', 'photos={}&to={}&owner_id={}'.format(','.join(ids), to, user))
-
         if data:
-            # % 25
-            items = []
-            for i in data['response']:
-                items += i
-            ids = []
-            for i, j in enumerate(items):
-                if i % 25 == 0:
-                    _(ids)
-                    print('sleep 3sec. loop %d' % i)
-                    sleep(3)
-                    ids = []
-                ids.append('%d' % j)
-            _(ids)
+            self._movePhotos(to, data['response'])
 
     def uploadPhotos(self):
         if uploadAlbumId == '':
@@ -308,14 +347,12 @@ class User:
             return False
 
         # if need delete old uploaded photos
-        self.deleteAllPhotos(uploadAlbumId)
+        # delete album here
 
-        data = request('photos.getUploadServer', 'album_id=' + str(uploadAlbumId))
-        data = json.loads(data)
-        if not (isinstance(data, object) and 'response' in data and 'upload_url' in data.get('response')):
+        data = json.loads(request('photos.getUploadServer', 'album_id=' + str(uploadAlbumId)))
+        if not data.get('response', False) or not data.get('response').get('upload_url', False):
             return False
-        data = data.get('response')
-        url = data.get('upload_url')
+        url = data.get('response').get('upload_url')
         path = join(getcwd(), 'vk_upload_files')
         if not isdir(path):
             return False
@@ -362,6 +399,28 @@ class User:
             if not args.hide:
                 print('uploaded finish')
 
+    def summary(self):
+        print(json.loads(request('execute.getSummaryData', '')))
+
+    def copyPhotos(self):
+        to = '249798346'
+        album_id = 'wall'
+        owner = '-127518015'
+        items = json.loads(request('execute.photosGetIds', 'owner=%s&album=%s' % (owner, album_id))).get('response', [])
+
+        # items = items[0:2]
+        moved_photos = self._copyPhotos(items, owner)
+        print(len(moved_photos))
+        exit()
+
+        if len(items):
+            self._movePhotos(to, moved_photos)
+
+    def deleteSavedPhotos(self):
+        items = json.loads(request('execute.photosGetIds', 'owner=%s&album=%s' % (user, 'saved'))).get('response', [])
+        self._deletePhotos(items)
+
+
 newUser = User()
 # newUser.photosGetAlbums()
 # newUser.photos()
@@ -383,6 +442,12 @@ if method == '-2':
         print(owner_id + '_' + str(i['id']))
 if method == '-3':
     newUser.movePhotos()
+if method == '-4':
+    newUser.copyPhotos()
+if method == '-5':
+    newUser.summary()
+if method == '-6':
+    newUser.deleteSavedPhotos()
 
 exit()
 
