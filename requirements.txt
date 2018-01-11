@@ -3,3 +3,5 @@ pandas>=0.19
 matplotlib>=0.1
 gTTS>=1.2
 pygame>=1.9
+pytesseract>0.1.5
+scipy>=1.0

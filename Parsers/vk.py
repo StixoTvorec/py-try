@@ -14,13 +14,11 @@ from os.path import (
     join,
     splitext,
     basename,
-    dirname,
 )
 from threading import Thread
 from time import sleep
 from urllib import error as request_error
 from urllib.request import urlopen
-from urllib.request import Request
 import hashlib
 
 from requests import Session
@@ -276,7 +274,8 @@ class User:
                 _(ids)
                 print('sleep 2sec. loop %d' % i)
                 ids = []
-            ids.append('%d' % j)
+            if j:
+                ids.append('%d' % j)
         sleep(2)
         _(ids)
 
@@ -299,6 +298,7 @@ class User:
 
     def _copyPhotos(self, items, owner):
         from captcha_decoder import decoder
+
         def _(_ids):
             if not len(_ids):
                 return []
@@ -306,20 +306,55 @@ class User:
 
         _items = []
         ids = []
+        print('Count items: %d' % len(items))
+        _captcha_img = '/tmp/__vk_captcha_img.png'
+
         for i, j in enumerate(items):
             if i and i % 25 == 0:
-                sleep(2)
+                print('Sleeping 10 sec')
+                sleep(10)
                 __ = json.loads(_(ids))
                 error = __.get('error', '')
+                _ERR = __.get('execute_errors', [{}])[0].get('error_msg', '')
+                if _ERR:
+                    print(_ERR)
+                    # exit()
                 if error:
+                    # __ = json.loads(_(ids))
                     print(error['error_msg'])
-                    print('try solving')
-                    captcha_sid = __.get('captcha_sid')
-                    captcha_img = __.get('captcha_img')
+                    if error.get('error_code') == 14:
 
-                    print(decoder(path/to/image))
+                        __n = 0
+                        while True:
+                            print('try solving')
 
-                    sleep(20)
+                            captcha_sid = error.get('captcha_sid')
+                            captcha_img = error.get('captcha_img')
+
+                            _safe_downloader(captcha_img, _captcha_img)
+
+                            solved = decoder(_captcha_img)
+
+                            print(solved)
+
+                            if __n > 10 or not len(solved):
+                                solved = input('\nNot solved. Need manual!\nSee {}\n'.format(_captcha_img))
+
+                            __ = json.loads(request('execute.photosCopy', 'photos={}&owner_id={}&captcha_sid={}&captcha_key={}'.format(
+                                ','.join(ids),
+                                owner,
+                                captcha_sid,
+                                solved
+                            )))
+                            __n += 1
+
+                            if not __.get('error'):
+                                break
+
+                            sleep(1)
+
+
+                    sleep(1)
                 _items += __.get('response', [])
                 print('sleep 2sec. loop %d' % i)
                 ids = []
@@ -330,8 +365,8 @@ class User:
         if error:
             print(error)
         _items += __.get('response', [])
-        print(_items)
-        exit()
+        # print(_items)
+        # exit()
         return _items
 
     def movePhotos(self, ids=None):
